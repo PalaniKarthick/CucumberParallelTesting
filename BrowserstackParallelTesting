@@ -1,0 +1,125 @@
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterClass;
+import io.cucumber.testng.PickleWrapper;
+import io.cucumber.testng.FeatureWrapper;
+import io.cucumber.testng.TestNGCucumberRunner;
+import io.cucumber.testng.CucumberOptions;
+
+@CucumberOptions(
+    glue = "com.browserstack.stepdefs",
+    plugin = {
+        "pretty",
+        "html:reports/tests/cucumber/html",
+        "timeline:reports/tests/cucumber/timeline",
+        "junit:reports/tests/cucumber/junit/cucumber.xml",
+        "testng:reports/tests/cucumber/testng/cucumber.xml",
+        "json:reports/tests/cucumber/json/cucumber.json"
+    }
+)
+public class RunWebDriverCucumberTests {
+
+    private TestNGCucumberRunner testNGCucumberRunner;
+    private Local local;
+    private static final ThreadLocal<ManagedWebDriver> threadLocalWebDriver = new ThreadLocal<>();
+
+    @BeforeClass(alwaysRun = true)
+    public void setUpClass() {
+        testNGCucumberRunner = new TestNGCucumberRunner(this.getClass());
+        // Initialize BrowserStack Local instance if needed
+        // Example: local = new Local();
+        // Utility.startLocal(local);
+    }
+
+    private synchronized static void setThreadLocalWebDriver(ManagedWebDriver managedWebDriver) {
+        threadLocalWebDriver.set(managedWebDriver);
+    }
+
+    public synchronized static ManagedWebDriver getManagedWebDriver() {
+        return threadLocalWebDriver.get();
+    }
+
+    @Test(groups = "cucumber", description = "Runs Cucumber Feature", dataProvider = "scenarios")
+    public void feature(PickleWrapper pickleWrapper, FeatureWrapper featureWrapper) {
+        ManagedWebDriver managedWebDriver = WebDriverFactory.createInstance(); // Replace with your WebDriver factory method
+        setThreadLocalWebDriver(managedWebDriver);
+
+        if(Utility.isLocal(managedWebDriver) && local == null){
+            local = new Local();
+            Utility.startLocal(local, managedWebDriver);
+        }
+        
+        managedWebDriver.setTestName(pickleWrapper.getPickle().getName());
+        testNGCucumberRunner.runScenario(pickleWrapper.getPickle());
+        managedWebDriver.quit(); // Make sure to quit the WebDriver after the test
+    }
+
+    @DataProvider(name = "scenarios", parallel = true)
+    public Iterator<Object[]> scenarios() {
+        return new LazyInitWebDriverIterator(testNGCucumberRunner.provideScenarios());
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDownClass() {
+        if(local != null){
+            local.stop();
+        }
+        if (testNGCucumberRunner != null) {
+            testNGCucumberRunner.finish();
+        }
+    }
+}
+
+====================================================
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+
+public class WebDriverFactory {
+
+    public static ManagedWebDriver createInstance() {
+        ChromeOptions options = new ChromeOptions();
+        // Add any ChromeOptions as per your requirements
+        WebDriver webDriver = new ChromeDriver(options);
+        return new ManagedWebDriver(webDriver);
+    }
+}
+
+===========================================
+import org.openqa.selenium.WebDriver;
+
+public class ManagedWebDriver {
+    private WebDriver webDriver;
+
+    public ManagedWebDriver(WebDriver webDriver) {
+        this.webDriver = webDriver;
+    }
+
+    public WebDriver getWebDriver() {
+        return webDriver;
+    }
+
+    public void setTestName(String testName) {
+        // Implement logic to set test name, if applicable
+    }
+
+    public void quit() {
+        if (webDriver != null) {
+            webDriver.quit();
+        }
+    }
+}
+========================================
+public class Utility {
+
+    public static boolean isLocal(ManagedWebDriver managedWebDriver) {
+        // Implement your logic to determine if the test should run locally
+        return false;
+    }
+
+    public static void startLocal(Local local, ManagedWebDriver managedWebDriver) {
+        // Implement the logic to start BrowserStack Local
+    }
+}
