@@ -123,3 +123,33 @@ public class Utility {
         // Implement the logic to start BrowserStack Local
     }
 }
+
+============================================
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
+public class LazyInitWebDriverIterator implements Iterator<Object[]> {
+
+    private final Object[][] scenarios;
+    private int currentIndex = 0;
+
+    public LazyInitWebDriverIterator(Object[][] scenarios) {
+        this.scenarios = scenarios;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return currentIndex < scenarios.length;
+    }
+
+    @Override
+    public Object[] next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
+        Object[] scenario = scenarios[currentIndex++];
+        // Replace last element with a new ManagedWebDriver instance
+        scenario[scenario.length - 1] = WebDriverFactory.createInstance();
+        return scenario;
+    }
+}
